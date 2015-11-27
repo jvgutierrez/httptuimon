@@ -1,5 +1,5 @@
-#httptuimon
-HTTP TUI monitor is a TUI based application that allows to monitor several UHTTP(S) URLs through a meaningful dashboard
+#HTTPTUIMON
+HTTP TUI monitor is a TUI based application that allows to monitor several HTTP(S) URLs through a meaningful dashboard
 
 ## Sample configuration
 ```
