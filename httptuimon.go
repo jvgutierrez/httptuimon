@@ -1,59 +1,18 @@
 package main
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
-	"net/http"
-	"time"
 
 	"github.com/gizak/termui"
+	"github.com/jvgutierrez/httptuimon/monitor"
 )
 
-type Monitor struct {
-	URL      string
-	Healthy  bool `json:"-"`
-	Duration time.Duration
-}
-
 type input struct {
-	Monitors []Monitor
-}
-
-func (m *Monitor) check() error {
-	tr := &http.Transport{
-		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
-		DisableKeepAlives: true,
-		Dial: (&net.Dialer{
-			Timeout: 5 * time.Second,
-		}).Dial,
-	}
-	defer tr.CloseIdleConnections()
-	client := &http.Client{Transport: tr}
-	req, err := http.NewRequest("GET", m.URL, nil)
-	if err != nil {
-		log.Printf("Unable to create request for %v\n", m.URL)
-		return err
-	}
-	start := time.Now()
-	response, err := client.Do(req)
-	if err != nil {
-		log.Printf("Unable to perform request to %v\n", m.URL)
-		return err
-	}
-	m.Duration = time.Since(start)
-	defer response.Body.Close()
-	if response.StatusCode >= 200 && response.StatusCode < 400 {
-		m.Healthy = true
-	} else {
-		m.Healthy = false
-	}
-
-	return nil
+	Monitors []monitor.Monitor
 }
 
 func main() {
@@ -77,7 +36,7 @@ func main() {
 	list.Width = 20
 	var urls []string
 	for i, m := range in.Monitors {
-		e := fmt.Sprintf("[%v] %v", i, m.URL)
+		e := fmt.Sprintf("[%v] %v", i, m.Source())
 		urls = append(urls, e)
 		if list.Width < int(float64(len(e))*float64(1.5)) {
 			list.Width = int(float64(len(e)) * float64(1.5))
@@ -105,8 +64,8 @@ func main() {
 		sp.Add(spark)
 	}
 	for i, m := range in.Monitors {
-		m.check()
-		sp.Lines[i].Data = append(sp.Lines[i].Data, int(m.Duration))
+		m.Check()
+		sp.Lines[i].Data = append(sp.Lines[i].Data, int(m.Duration()))
 	}
 
 	termui.Render(list, sp)
@@ -119,10 +78,10 @@ func main() {
 		t := e.Data.(termui.EvtTimer)
 		if t.Count%5 == 0 {
 			for i, m := range in.Monitors {
-				if err := m.check(); err != nil {
+				if err := m.Check(); err != nil {
 					log.Fatalf("%v\n", err)
 				}
-				sp.Lines[i].Data = append(sp.Lines[i].Data, int(m.Duration))
+				sp.Lines[i].Data = append(sp.Lines[i].Data, int(m.Duration()))
 			}
 			termui.Render(list, sp)
 		}
