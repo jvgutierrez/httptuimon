@@ -2,7 +2,6 @@ package monitor
 
 import (
 	"crypto/tls"
-	"errors"
 	"log"
 	"net"
 	"net/http"
@@ -80,5 +79,4 @@ func (m *HTTPMonitor) Check(c chan CheckUpdate, id uint32) {
 	} else {
 		m.healthy = false
 	}
-	err = errors.New("test")
 }
