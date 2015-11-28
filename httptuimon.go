@@ -25,8 +25,10 @@ type UIMonitor struct {
 	monitor monitor.Monitor
 }
 
-const COLOR_OK = termui.ColorGreen
-const COLOR_KO = termui.ColorRed
+const (
+	COLOR_OK = termui.ColorGreen
+	COLOR_KO = termui.ColorRed
+)
 
 func readConfig(fn string) []UIMonitor {
 	file, err := ioutil.ReadFile(fn)
