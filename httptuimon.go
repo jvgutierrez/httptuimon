@@ -89,6 +89,12 @@ func main() {
 		spark.TitleColor = termui.ColorWhite
 		sp.Add(spark)
 	}
+	termui.Body.AddRows(
+		termui.NewRow(
+			termui.NewCol(6, 0, list),
+			termui.NewCol(6, 0, sp)))
+	termui.Body.Align()
+
 	for _, m := range monitors {
 		go m.monitor.Check(updates, m.index)
 	}
@@ -106,7 +112,7 @@ loop:
 		}
 	}
 
-	termui.Render(list, sp)
+	termui.Render(termui.Body)
 
 	termui.Handle("/sys/kbd/q", func(termui.Event) {
 		termui.StopLoop()
@@ -132,7 +138,7 @@ loop:
 					break loop
 				}
 			}
-			termui.Render(list, sp)
+			termui.Render(termui.Body)
 		}
 	})
 
