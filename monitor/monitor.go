@@ -76,7 +76,9 @@ func (m *HTTPMonitor) Check(c chan CheckUpdate, id uint32) {
 	defer response.Body.Close()
 	if response.StatusCode >= 200 && response.StatusCode < 400 {
 		m.healthy = true
+		ret.Healthy = true
 	} else {
 		m.healthy = false
+		ret.Healthy = false
 	}
 }
