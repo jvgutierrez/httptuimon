@@ -25,6 +25,9 @@ type UIMonitor struct {
 	monitor monitor.Monitor
 }
 
+const COLOR_OK = termui.ColorGreen
+const COLOR_KO = termui.ColorRed
+
 func readConfig(fn string) []UIMonitor {
 	file, err := ioutil.ReadFile(fn)
 	if err != nil {
@@ -91,7 +94,11 @@ loop:
 	for {
 		select {
 		case u := <-updates:
-			sp.Lines[u.Id].Data = append(sp.Lines[u.Id].Data, int(u.Duration))
+			if u.Healthy && u.Err == nil {
+				sp.Lines[u.Id].LineColor = COLOR_OK
+			} else {
+				sp.Lines[u.Id].LineColor = COLOR_KO
+			}
 		case <-time.After(2 * time.Second):
 			break loop
 		}
@@ -114,6 +121,11 @@ loop:
 				select {
 				case u := <-updates:
 					sp.Lines[u.Id].Data = append(sp.Lines[u.Id].Data, int(u.Duration))
+					if u.Healthy && u.Err == nil {
+						sp.Lines[u.Id].LineColor = COLOR_OK
+					} else {
+						sp.Lines[u.Id].LineColor = COLOR_KO
+					}
 				case <-time.After(2 * time.Second):
 					break loop
 				}
