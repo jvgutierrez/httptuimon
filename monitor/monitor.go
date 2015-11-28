@@ -9,16 +9,27 @@ import (
 )
 
 type Monitor interface {
-	Check() error
+	Check(chan CheckUpdate, uint32) error
 	Healthy() bool
 	Source() string
 	Duration() time.Duration
+}
+
+type CheckUpdate struct {
+	Id       uint32
+	Healthy  bool
+	Duration time.Duration
 }
 
 type HTTPMonitor struct {
 	url      string
 	healthy  bool
 	duration time.Duration
+	err      error
+}
+
+func NewHTTPMonitor(url string) *HTTPMonitor {
+	return &HTTPMonitor{url: url}
 }
 
 func (m *HTTPMonitor) Source() string {
@@ -33,7 +44,7 @@ func (m *HTTPMonitor) Duration() time.Duration {
 	return m.duration
 }
 
-func (m *HTTPMonitor) Check() error {
+func (m *HTTPMonitor) Check(c chan CheckUpdate, id uint32) error {
 	tr := &http.Transport{
 		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 		DisableKeepAlives: true,
@@ -61,6 +72,10 @@ func (m *HTTPMonitor) Check() error {
 	} else {
 		m.healthy = false
 	}
-
+	c <- CheckUpdate{
+		Id:       id,
+		Duration: m.duration,
+		Healthy:  m.healthy,
+	}
 	return nil
 }

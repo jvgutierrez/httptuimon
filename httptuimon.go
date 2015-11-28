@@ -6,28 +6,49 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"time"
 
 	"github.com/gizak/termui"
 	"github.com/jvgutierrez/httptuimon/monitor"
 )
 
-type input struct {
-	Monitors []monitor.Monitor
+type configFile struct {
+	Entries []configEntry `json:"monitors"`
 }
 
-func main() {
-	config := flag.String("config", "config.json", "Configuration file")
-	flag.Parse()
-	file, err := ioutil.ReadFile(*config)
+type configEntry struct {
+	URL string
+}
+
+type UIMonitor struct {
+	index   uint32
+	monitor monitor.Monitor
+}
+
+func readConfig(fn string) []UIMonitor {
+	file, err := ioutil.ReadFile(fn)
 	if err != nil {
 		log.Fatalf("Unable to read config file: %v\n", err)
 	}
-	var in input
-	err = json.Unmarshal(file, &in)
+	var cf configFile
+	err = json.Unmarshal(file, &cf)
 	if err != nil {
 		log.Fatalf("Unable to read config: %v\n", err)
 	}
-	err = termui.Init()
+	ret := make([]UIMonitor, len(cf.Entries))
+	for i, entry := range cf.Entries {
+		ret[i].index = uint32(i)
+		ret[i].monitor = monitor.NewHTTPMonitor(entry.URL)
+	}
+	return ret
+}
+
+func main() {
+	configFile := flag.String("config", "config.json", "Configuration file")
+	flag.Parse()
+	monitors := readConfig(*configFile)
+	updates := make(chan monitor.CheckUpdate)
+	err := termui.Init()
 	if err != nil {
 		log.Fatalf("Unable to init termui: %v\n", err)
 	}
@@ -35,8 +56,8 @@ func main() {
 	list := termui.NewList()
 	list.Width = 20
 	var urls []string
-	for i, m := range in.Monitors {
-		e := fmt.Sprintf("[%v] %v", i, m.Source())
+	for _, m := range monitors {
+		e := fmt.Sprintf("[%v] %v", m.index, m.monitor.Source())
 		urls = append(urls, e)
 		if list.Width < int(float64(len(e))*float64(1.5)) {
 			list.Width = int(float64(len(e)) * float64(1.5))
@@ -63,9 +84,17 @@ func main() {
 		spark.TitleColor = termui.ColorWhite
 		sp.Add(spark)
 	}
-	for i, m := range in.Monitors {
-		m.Check()
-		sp.Lines[i].Data = append(sp.Lines[i].Data, int(m.Duration()))
+	for _, m := range monitors {
+		go m.monitor.Check(updates, m.index)
+	}
+loop:
+	for {
+		select {
+		case u := <-updates:
+			sp.Lines[u.Id].Data = append(sp.Lines[u.Id].Data, int(u.Duration))
+		case <-time.After(2 * time.Second):
+			break loop
+		}
 	}
 
 	termui.Render(list, sp)
@@ -77,11 +106,17 @@ func main() {
 	termui.Handle("/timer/1s", func(e termui.Event) {
 		t := e.Data.(termui.EvtTimer)
 		if t.Count%5 == 0 {
-			for i, m := range in.Monitors {
-				if err := m.Check(); err != nil {
-					log.Fatalf("%v\n", err)
+			for _, m := range monitors {
+				go m.monitor.Check(updates, m.index)
+			}
+		loop:
+			for {
+				select {
+				case u := <-updates:
+					sp.Lines[u.Id].Data = append(sp.Lines[u.Id].Data, int(u.Duration))
+				case <-time.After(2 * time.Second):
+					break loop
 				}
-				sp.Lines[i].Data = append(sp.Lines[i].Data, int(m.Duration()))
 			}
 			termui.Render(list, sp)
 		}
