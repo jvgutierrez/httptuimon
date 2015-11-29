@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -53,13 +54,14 @@ func main() {
 	flag.Parse()
 	monitors := readConfig(*configFile)
 	updates := make(chan monitor.CheckUpdate)
+	logbuf := new(bytes.Buffer)
+	log.SetOutput(logbuf)
 	err := termui.Init()
 	if err != nil {
 		log.Fatalf("Unable to init termui: %v\n", err)
 	}
 	defer termui.Close()
 	list := termui.NewList()
-	list.Width = 20
 	var urls []string
 	for _, m := range monitors {
 		e := fmt.Sprintf("[%v] %v", m.index, m.monitor.Source())
@@ -71,7 +73,7 @@ func main() {
 	list.Items = urls
 	list.ItemFgColor = termui.ColorYellow
 	list.BorderLabel = "URLs"
-	list.Height = len(urls) * 2
+	list.Height = 8
 	list.Y = 0
 	list.X = 0
 
@@ -79,20 +81,23 @@ func main() {
 	sp.BorderLabel = "Response times"
 	sp.Y = list.Height
 	sp.X = 0
-	sp.Height = (len(urls)*3 - 1)
-	sp.Width = list.Width
+	sp.Height = list.Height
 	for i, _ := range urls {
 		spark := termui.Sparkline{}
 		spark.Height = 1
 		spark.Title = fmt.Sprintf("URL %v", i)
 		spark.LineColor = termui.ColorCyan
-		spark.TitleColor = termui.ColorWhite
+		spark.TitleColor = termui.ColorYellow
 		sp.Add(spark)
 	}
+	logPar := termui.NewPar(logbuf.String())
+	logPar.Height = 20
 	termui.Body.AddRows(
 		termui.NewRow(
 			termui.NewCol(6, 0, list),
-			termui.NewCol(6, 0, sp)))
+			termui.NewCol(6, 0, sp)),
+		termui.NewRow(
+			termui.NewCol(12, 0, logPar)))
 	termui.Body.Align()
 
 	for _, m := range monitors {
@@ -138,6 +143,7 @@ loop:
 					break loop
 				}
 			}
+			logPar.Text = logbuf.String()
 			termui.Render(termui.Body)
 		}
 	})
